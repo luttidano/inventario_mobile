@@ -58,7 +58,13 @@ class _ProductoFormScreenState extends State<ProductoFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.producto == null ? 'Nuevo producto' : 'Editar producto')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        title: Text(widget.producto == null ? 'Nuevo producto' : 'Editar producto'),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: ListView(

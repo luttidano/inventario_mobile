@@ -43,7 +43,13 @@ class _CategoriaFormScreenState extends State<CategoriaFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.categoria == null ? 'Nueva categoria' : 'Editar categoria')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        title: Text(widget.categoria == null ? 'Nueva categoria' : 'Editar categoria'),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

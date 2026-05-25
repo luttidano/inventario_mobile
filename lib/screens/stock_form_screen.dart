@@ -52,7 +52,13 @@ class _StockFormScreenState extends State<StockFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.stock == null ? 'Nuevo stock' : 'Editar stock')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        title: Text(widget.stock == null ? 'Nuevo stock' : 'Editar stock'),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: ListView(

@@ -47,7 +47,13 @@ class _StockEditScreenState extends State<StockEditScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Stock - ${widget.productoNombre}')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        title: Text('Stock - ${widget.productoNombre}'),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

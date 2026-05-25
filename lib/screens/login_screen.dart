@@ -31,7 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (ok) {
         final api = ApiService(widget.authService);
         final me = await api.getMe();
-        final isAdmin = me['is_superuser'] == true;
+        final isAdmin = me['is_admin'] == true || me['is_superuser'] == true;
 
         final next = isAdmin
             ? AdminMenuScreen(authService: widget.authService)

@@ -46,7 +46,13 @@ class _SucursalFormScreenState extends State<SucursalFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.sucursal == null ? 'Nueva sucursal' : 'Editar sucursal')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        title: Text(widget.sucursal == null ? 'Nueva sucursal' : 'Editar sucursal'),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: ListView(
