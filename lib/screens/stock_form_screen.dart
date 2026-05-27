@@ -2,17 +2,8 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
 class StockFormScreen extends StatefulWidget {
-  const StockFormScreen({
-    super.key,
-    required this.api,
-    required this.productos,
-    required this.sucursales,
-    this.stock,
-  });
-
+  const StockFormScreen({super.key, required this.api, this.stock});
   final ApiService api;
-  final List<dynamic> productos;
-  final List<dynamic> sucursales;
   final Map<String, dynamic>? stock;
 
   @override
@@ -20,83 +11,248 @@ class StockFormScreen extends StatefulWidget {
 }
 
 class _StockFormScreenState extends State<StockFormScreen> {
-  int? _productoId;
-  int? _sucursalId;
-  final TextEditingController _cantidad = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  late final TextEditingController _cantidadController;
+  int? _selectedProductoId;
+  int? _selectedSucursalId;
+
+  List<dynamic> _productos = [];
+  List<dynamic> _sucursales = [];
+
+  bool _isLoading = true;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    _productoId = widget.stock?['producto'];
-    _sucursalId = widget.stock?['sucursal'];
-    _cantidad.text = (widget.stock?['cantidad'] ?? 0).toString();
+    _cantidadController = TextEditingController(
+      text: widget.stock?['cantidad']?.toString() ?? '',
+    );
+    _selectedProductoId = widget.stock?['producto'] as int?;
+    _selectedSucursalId = widget.stock?['sucursal'] as int?;
+
+    _loadData();
+  }
+
+  @override
+  void dispose() {
+    _cantidadController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final results = await Future.wait([
+        widget.api.getProductos(),
+        widget.api.getSucursales(),
+      ]);
+
+      setState(() {
+        _productos = results[0];
+        // Filter to active branches
+        _sucursales = results[1].where((b) => b['activa'] == true).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading form data for stock: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error al cargar productos o sucursales')),
+        );
+      }
+    }
   }
 
   Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    final qty = int.tryParse(_cantidadController.text.trim()) ?? 0;
+    
     final data = {
-      'producto': _productoId,
-      'sucursal': _sucursalId,
-      'cantidad': int.tryParse(_cantidad.text) ?? 0,
+      'producto': _selectedProductoId,
+      'sucursal': _selectedSucursalId,
+      'cantidad': qty,
     };
 
-    if (widget.stock == null) {
-      await widget.api.createStock(data);
-    } else {
-      await widget.api.updateStock(widget.stock!['id'], data);
-    }
+    try {
+      if (widget.stock == null) {
+        await widget.api.createStock(data);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Stock registrado con éxito'),
+              backgroundColor: Color(0xFF0F4C5C),
+            ),
+          );
+        }
+      } else {
+        await widget.api.updateStock(widget.stock!['id'], data);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Stock actualizado con éxito'),
+              backgroundColor: Color(0xFF0F4C5C),
+            ),
+          );
+        }
+      }
 
-    if (!mounted) return;
-    Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      debugPrint('Error saving stock: $e');
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al registrar stock: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isEditing = widget.stock != null;
+
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
-        title: Text(widget.stock == null ? 'Nuevo stock' : 'Editar stock'),
+        title: Text(isEditing ? 'Editar Stock' : 'Registrar Stock'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ListView(
-          children: [
-            DropdownButtonFormField<int>(
-              value: _productoId,
-              items: widget.productos
-                  .map((p) => DropdownMenuItem<int>(
-                        value: p['id'],
-                        child: Text(p['nombre']),
-                      ))
-                  .toList(),
-              onChanged: (v) => setState(() => _productoId = v),
-              decoration: const InputDecoration(labelText: 'Producto'),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF1F7A8C)))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Detalles del Inventario',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Product Dropdown
+                            DropdownButtonFormField<int>(
+                              value: _selectedProductoId,
+                              decoration: const InputDecoration(
+                                labelText: 'Producto',
+                                prefixIcon: Icon(Icons.inventory_2_outlined, size: 20),
+                              ),
+                              items: _productos.map<DropdownMenuItem<int>>((prod) {
+                                return DropdownMenuItem<int>(
+                                  value: prod['id'],
+                                  child: Text(prod['nombre'] ?? ''),
+                                );
+                              }).toList(),
+                              onChanged: isEditing
+                                  ? null // Cannot change product when editing existing stock entry
+                                  : (value) {
+                                      setState(() {
+                                        _selectedProductoId = value;
+                                      });
+                                    },
+                              validator: (value) {
+                                if (value == null) {
+                                  return 'Por favor selecciona un producto';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Branch Dropdown
+                            DropdownButtonFormField<int>(
+                              value: _selectedSucursalId,
+                              decoration: const InputDecoration(
+                                labelText: 'Sucursal',
+                                prefixIcon: Icon(Icons.store_outlined, size: 20),
+                              ),
+                              items: _sucursales.map<DropdownMenuItem<int>>((branch) {
+                                return DropdownMenuItem<int>(
+                                  value: branch['id'],
+                                  child: Text(branch['nombre'] ?? ''),
+                                );
+                              }).toList(),
+                              onChanged: isEditing
+                                  ? null // Cannot change branch when editing existing stock entry
+                                  : (value) {
+                                      setState(() {
+                                        _selectedSucursalId = value;
+                                      });
+                                    },
+                              validator: (value) {
+                                if (value == null) {
+                                  return 'Por favor selecciona una sucursal';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Quantity Text Field
+                            TextFormField(
+                              controller: _cantidadController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Cantidad de Stock',
+                                prefixIcon: Icon(Icons.numbers_rounded, size: 20),
+                                hintText: 'Ej. 10, 50, 100',
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Por favor ingresa la cantidad';
+                                }
+                                final qty = int.tryParse(value);
+                                if (qty == null || qty < 0) {
+                                  return 'Por favor ingresa un número entero positivo';
+                                }
+                                return null;
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Save button
+                    ElevatedButton(
+                      onPressed: _isSaving ? null : _save,
+                      child: _isSaving
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Text('Guardar Existencia'),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<int>(
-              value: _sucursalId,
-              items: widget.sucursales
-                  .map((s) => DropdownMenuItem<int>(
-                        value: s['id'],
-                        child: Text(s['nombre']),
-                      ))
-                  .toList(),
-              onChanged: (v) => setState(() => _sucursalId = v),
-              decoration: const InputDecoration(labelText: 'Sucursal'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _cantidad,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Cantidad'),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(onPressed: _save, child: const Text('Guardar')),
-          ],
-        ),
-      ),
     );
   }
 }
